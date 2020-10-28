@@ -22,6 +22,35 @@ struct VBHeader
 
 int enumIMPORTS(ea_t ea, const char *name, uval_t ord, void *param)
 {
+	if(name)
+	{
+		if(map_VBVM[name]!="")
+		{
+			apply_cdelc(idati,ea,map_VBVM[name].c_str(),TINFO_DEFINITE);
+		}
+		else
+		{
+			msg("%s\n",name);
+		}
+	}
+	
+	switch(ord)
+	{
+		case 561:
+			apply_cdecl(idati,ea,"short __stdcall rtcIsNumeric(VARIANT* iVar);",TINFO_DEFINITE);
+			break;
+		case 573:
+			apply_cdelc(idati,ea,"VARIANT* __stdcall rtcHexVarFromVar(VARIANT*,VARIANT*);",TINFO_DEFINITE);
+			break;
+		case 617:
+			apply_cdecl(idati,ea,"VARIANT* __stdcall rtcLeftCharVar(VARIANT*,VARIANT*,int);",TINFO_DEFINITE);
+			break;
+		case 632:
+			apply_cdecl(idati,ea,"VARIANT* __stdcall rtcMidCharVar(VARIANT* outStr,VARIANT* Src,int offset,VARIANT* subLen);",TINFO_DEFINITE);
+			break;
+		default:
+			break;
+	}
 	return 1;
 }
 
@@ -29,8 +58,18 @@ void FixVBImports()
 {
 	if (map_VBVM.size() == 0)
 	{
+		map_VBVM["__vbaAryMove"]="SAFEARRAY* __stdcall _vbaAryMove(SAFEARRAY **, SAFEARRAY **);";
 		map_VBVM["__vbaExitProc"] = "void __stdcall _vbaExitProc();";
 		map_VBVM["__vbaEnd"] = "void __usercall __noreturn _vbaEnd(int a1@<esi>, int a2@<edi>);";
+		
+		map_VBVM["__vbaErrorOverflow"] = "void __stdcall __noreturn _vbaErrorOverflow();";
+		
+		map_VBVM["__vbaFreeObj"] = "void __thiscall _vbaFreeObj(LPVOID);";
+		map_VBVM["__vbaFreeStr"] = "void __fastcall _vbaFreeStr(BSTR *);";
+		map_VBVM["__vbaFreeVar"] = "void __fastcall _vbaFreeVar(VARIANT*);";
+		
+		//To do...
+		
 		map_VBVM["__vbaNew"] = "LPVOID __stdcall _vbaNew(LPVOID ppv);";
 		map_VBVM["__vbaObjSet"] = "LPVOID __stdcall _vbaObjSet(LPVOID a1, LPVOID a2);";
 		map_VBVM["__vbaStrCat"] = "BSTR __stdcall _vbaStrCat(wchar_t *, wchar_t *);";
