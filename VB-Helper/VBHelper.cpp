@@ -1,8 +1,9 @@
 #include <hexrays.hpp>
 #include <auto.hpp>
-
+#include <diskio.hpp>
 #include "public.h"
 #include "ImportsFix.h"
+#include "ComManager.h"
 
  // Hex-Rays API pointer
 hexdsp_t* hexdsp = nullptr;
@@ -24,6 +25,11 @@ struct plugin_ctx_t : public plugmod_t
 //--------------------------------------------------------------------------
 static plugmod_t* idaapi init()
 {
+    qstring qstr_ProcName = inf.procname;
+	if (qstr_ProcName != "metapc" || inf.filetype != f_PE)
+	{
+		return NULL;
+	}
     if (!init_hexrays_plugin())
         return nullptr; // no decompiler
     const char* hxver = get_hexrays_version();
@@ -41,7 +47,7 @@ bool idaapi plugin_ctx_t::run(size_t)
 
 	FixVBImports();
 
-
+    InitComManager();
     return true;
 }
 

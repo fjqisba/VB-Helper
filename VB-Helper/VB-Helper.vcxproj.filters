@@ -24,12 +24,24 @@
     <ClCompile Include="public.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="ComManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ComParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImportsFix.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="public.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ComManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ComParser.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

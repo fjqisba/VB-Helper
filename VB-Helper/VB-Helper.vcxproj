@@ -144,11 +144,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ComManager.cpp" />
+    <ClCompile Include="ComParser.cpp" />
     <ClCompile Include="ImportsFix.cpp" />
     <ClCompile Include="public.cpp" />
     <ClCompile Include="VBHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ComManager.h" />
+    <ClInclude Include="ComParser.h" />
     <ClInclude Include="ImportsFix.h" />
     <ClInclude Include="public.h" />
   </ItemGroup>
