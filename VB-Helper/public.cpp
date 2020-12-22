@@ -1,5 +1,7 @@
 #include "public.h"
 
+til_t* idati = NULL;
+
 qstring charToUUID(uint8* uuid_Addr)
 {
 	char buff_uuid[40] = { 0 };

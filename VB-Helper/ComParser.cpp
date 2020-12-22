@@ -1,5 +1,5 @@
 #include "ComParser.h"
-
+#include <diskio.hpp>
 #include <objbase.h>
 #include <atlbase.h>
 #include <atlcom.h>

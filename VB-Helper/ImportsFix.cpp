@@ -1,9 +1,7 @@
-//µº»Î±Ì–ﬁ∏¥
-
-#include <map>
+#include "ImportsFix.h"
 #include "public.h"
-std::map<qstring, qstring> map_VBVM;
 
+std::map<qstring, qstring> map_VBVM;
 
 int idaapi enumVBImports(ea_t ea, const char* name, uval_t ord, void* param)
 {

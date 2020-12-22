@@ -13,11 +13,14 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="头文件\COM">
+      <UniqueIdentifier>{530fd774-b847-4037-bf0c-bfb0e2069f57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\VBDecompiler">
+      <UniqueIdentifier>{c8d0aaa9-eb72-411a-b561-6d02a2e27670}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="VBHelper.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="ImportsFix.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -30,6 +33,12 @@
     <ClCompile Include="ComParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="VbDecompiler.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="VBHelper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ImportsFix.h">
@@ -38,11 +47,17 @@
     <ClInclude Include="public.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="middleVB.h">
+      <Filter>头文件\VBDecompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="VBDecompiler.h">
+      <Filter>头文件\VBDecompiler</Filter>
+    </ClInclude>
     <ClInclude Include="ComManager.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\COM</Filter>
     </ClInclude>
     <ClInclude Include="ComParser.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\COM</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

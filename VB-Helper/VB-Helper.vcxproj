@@ -148,13 +148,16 @@
     <ClCompile Include="ComParser.cpp" />
     <ClCompile Include="ImportsFix.cpp" />
     <ClCompile Include="public.cpp" />
+    <ClCompile Include="VbDecompiler.cpp" />
     <ClCompile Include="VBHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ComManager.h" />
     <ClInclude Include="ComParser.h" />
     <ClInclude Include="ImportsFix.h" />
+    <ClInclude Include="middleVB.h" />
     <ClInclude Include="public.h" />
+    <ClInclude Include="VBDecompiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

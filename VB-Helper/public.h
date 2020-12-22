@@ -1,10 +1,9 @@
-#ifndef public_h__
-#define public_h__
+#pragma once
+
+#define VBHPPFILE "VB.hpp"
 
 #include <typeinf.hpp>
 #include <pro.h>
-
-#define VBHPPFILE "VB.hpp"
 
 extern til_t* idati;
 
@@ -20,4 +19,4 @@ qstring get_shortstring(ea_t ea);
 
 qstring charToUUID(uint8* pChar);
 
-#endif // public_h__
+

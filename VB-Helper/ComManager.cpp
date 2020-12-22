@@ -1,8 +1,8 @@
 #include "ComManager.h"
-
+#include "public.h"
 #include <hexrays.hpp>
 #include <diskio.hpp>
-
+#include "ComParser.h"
 
 int idaapi EnumerateTypeLib(const char* file, void* ud)
 {
