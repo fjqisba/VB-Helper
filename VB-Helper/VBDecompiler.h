@@ -339,14 +339,23 @@ private:
 
 	bool VBDE_ComRegData(uint32 lpComRegDataAddr);
 	bool VBDE_ExternalControl(uint32 lpExControlAddr, uint32 cCount);
+
+protected:
+	void GetAllGuidXref(std::map<ea_t, qvector<ObjData>>& outMap, ea_t HresultCheckObj);
+	bool HandleCheckObj(func_t* pfunc, qvector<ObjData> vec_ObjData);
+	std::map<qstring, qvector<coClassInfo>> m_GuidMap;
 public:
 	bool DoDecompile(ea_t PEEntry);
 	void MakeFunction();
 	void CreateVTable();
 	void SetSubMain();
-	void SetEventFuncName(std::map<qstring, qvector<coClassInfo>>& oMap);
-	void AddClassGuid(std::map<qstring, qvector<coClassInfo>>& oMap);
+	void SetEventFuncName();
+	void AddClassGuid();
 
+	//对COM接口调用进行刷写
+	bool FlashComInterface();
+
+	bool Load_VBHpp();
 	//获取用户代码段起始地址
 	ea_t GetUserCodeStartAddr();
 	//获取用户代码段结束地址

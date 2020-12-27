@@ -34,7 +34,7 @@ static plugmod_t* idaapi init()
 	if (!init_hexrays_plugin())
 		return nullptr; // no decompiler
 	const char* hxver = get_hexrays_version();
-	msg("[VB-Helper plugin 1.0 loaded,Author: fjqisba\n");
+	msg("[VB-Helper] plugin 1.0 loaded,Author: fjqisba\n");
 	return new plugin_ctx_t;
 }
 
@@ -72,8 +72,29 @@ bool idaapi plugin_ctx_t::run(size_t)
 	vbEngine.CreateVTable();
 	hide_wait_box();
 
+	//加载VB.hpp
+	show_wait_box("Load COM Structure...");
+	if (!vbEngine.Load_VBHpp())
+	{
+		hide_wait_box();
+		info("Load VB.hpp error");
+		return false;
+	}
+	hide_wait_box();
 
 
+	//解析程序自身的Object,将类的GUID添加到map中
+	vbEngine.AddClassGuid();
+
+	//设置控件函数的事件名称
+	vbEngine.SetEventFuncName();
+
+	show_wait_box("Flash VB Imports...");
+	auto_wait();
+	hide_wait_box();
+
+	
+	vbEngine.FlashComInterface();
 	return true;
 }
 

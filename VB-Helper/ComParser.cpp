@@ -25,7 +25,7 @@ struct mid_COMINFO
 	qvector<mid_INTERFACE> m_Interface;					//所有的COM接口
 
 	//辅助成员
-	std::set<qstring> mSet_Interface;
+	std::set<qstring> mSet_Interface;					//用于记录接口是否被解析过
 };
 
 qstring StringFromGUID(REFGUID guid)
@@ -119,7 +119,7 @@ bool DeCompileInterfaceInfo(ITypeInfo* pti, mid_INTERFACE& eInterface)
 	if (eInterface.m_BaseClassName.empty())
 	{
 		pti->ReleaseTypeAttr(pattr);
-		return true;
+		return false;
 	}
 
 	if (pattr->wTypeFlags & TYPEFLAG_FDUAL)
@@ -434,9 +434,11 @@ bool ParseComInfo(qstring DllPath, mid_COMINFO& COMInfo)
 				{
 					mid_INTERFACE eInterface;
 					eInterface.m_COCLASSGUID = "00000000-0000-0000-0000-000000000000";
-					ret = DeCompileInterfaceInfo(pTypeInfo, eInterface);
-					COMInfo.m_Interface.push_back(eInterface);
-					COMInfo.mSet_Interface.insert(InterfaceName);
+					if (DeCompileInterfaceInfo(pTypeInfo, eInterface))
+					{
+						COMInfo.m_Interface.push_back(eInterface);
+						COMInfo.mSet_Interface.insert(InterfaceName);
+					}
 				}
 			}
 			pTypeInfo->ReleaseTypeAttr(TypeAttr);

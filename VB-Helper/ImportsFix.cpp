@@ -107,3 +107,36 @@ void FixVBImports()
 		}
 	}
 }
+
+int idaapi enumCheckObj(ea_t ea, const char* name, uval_t ord, void* param)
+{
+	qstring qName = name;
+
+	if (qName == "__vbaHresultCheckObj")
+	{
+		*(ea_t*)param = ea;
+		return 0;
+	}
+
+	return 1;
+}
+
+ea_t GetHresultCheckObjAddr()
+{
+	ea_t ret = BADADDR;
+	uint num = get_import_module_qty();
+	for (unsigned int n = 0; n < num; ++n)
+	{
+		qstring ModuleName;
+		if (!get_import_module_name(&ModuleName, n))
+		{
+			continue;
+		}
+		if (ModuleName == "MSVBVM60")
+		{
+			enum_import_names(n, enumCheckObj, &ret);
+		}
+	}
+
+	return ret;
+}

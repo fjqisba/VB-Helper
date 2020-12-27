@@ -13,6 +13,12 @@ struct coClassInfo
 	qstring StructName;
 };
 
+struct ObjData
+{
+	ea_t GuidAddr;
+	qstring StructName;
+};
+
 qstring get_uuid(ea_t uuidAddr);
 
 qstring get_shortstring(ea_t ea);

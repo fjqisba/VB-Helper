@@ -2,7 +2,9 @@
 #include <allins.hpp>
 #include <struct.hpp>
 #include <bytes.hpp>
+#include <diskio.hpp>
 #include <hexrays.hpp>
+#include "ImportsFix.h"
 
 void 设置函数名称(ea_t FuncAddr, const char* FuncName)
 {
@@ -13,6 +15,278 @@ void 设置函数名称(ea_t FuncAddr, const char* FuncName)
 	{
 		set_name(FuncAddr, FuncName);
 	}
+}
+
+//IDA存在函数识别错误的情况,需要进行刷新
+void RefreshFuncion(ea_t StartFuncAddr)
+{
+	func_t* pfunc = get_func(StartFuncAddr);
+	if (!pfunc)
+	{
+		return;
+	}
+	hexrays_failure_t hf;
+	cfunc_t* cfunc = decompile_func(pfunc, &hf);
+	if (!cfunc)
+	{
+		return;
+	}
+	open_pseudocode(StartFuncAddr, -1);
+}
+
+qstring FindCheckObjGUID(ea_t CheckObjAddr, ea_t& GuidAddr)
+{
+	qstring ret;
+	unsigned int pushCount = 0;
+	for (unsigned int n = 0; n < 12; ++n)
+	{
+		insn_t ins_Push;
+		CheckObjAddr = decode_prev_insn(&ins_Push, CheckObjAddr);
+		if (CheckObjAddr == BADADDR)
+		{
+			return ret;
+		}
+		//向上找第三条push指令
+		if (ins_Push.itype == NN_push && ++pushCount == 3)
+		{
+			if (ins_Push.ops[0].type == o_imm)
+			{
+				GuidAddr = ins_Push.ops[0].value;
+				ret = get_uuid(GuidAddr);
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
+bool AddFunctionComment(cfunc_t* cfunc, cexpr_t* pCheckObjCall, ObjData& eObjData)
+{
+	strvec_t& sv = cfunc->sv;
+
+	carg_t& pNumVar = pCheckObjCall->a->at(3);
+	uint32 VOffset = pNumVar.n->_value;
+
+	ea_t CheckObjCALLAddr = eObjData.GuidAddr;
+	unsigned int TryCount = 0;
+	while (true)
+	{
+		insn_t tmpIns;
+
+		CheckObjCALLAddr = decode_prev_insn(&tmpIns, CheckObjCALLAddr);
+		if (CheckObjCALLAddr == BADADDR)
+		{
+			return false;
+		}
+		if (TryCount++ > 12)
+		{
+			return false;
+		}
+		if (tmpIns.itype == NN_jge)
+		{
+			break;
+		}
+	}
+
+	TryCount = 0;
+	citem_t* pComCallItem;
+	while (true)
+	{
+		insn_t tmpIns;
+		CheckObjCALLAddr = decode_prev_insn(&tmpIns, CheckObjCALLAddr);
+		if (CheckObjCALLAddr == BADADDR)
+		{
+			return false;
+		}
+		if (TryCount++ > 6)
+		{
+			return false;
+		}
+
+		if (tmpIns.itype == NN_callni)
+		{
+			pComCallItem = cfunc->body.find_closest_addr(CheckObjCALLAddr);
+			break;
+		}
+	}
+
+	int px, py;
+	if (!cfunc->find_item_coords(pComCallItem, &px, &py))
+	{
+		return false;
+	}
+
+	ctree_item_t treeCommentItem;
+	cfunc->get_line_item(sv[py].line.c_str(), px, true, NULL, NULL, &treeCommentItem);
+
+	qstring VTableName = eObjData.StructName + "_vtbl";
+	import_type(idati, -1, VTableName.c_str());
+	tid_t idStruct = get_struc_id(VTableName.c_str());
+	tid_t idMember = get_member_id(get_struc(idStruct), VOffset);
+	qstring CallFuncName = get_member_name(idMember);
+
+	cfunc->set_user_cmt(treeCommentItem.loc, CallFuncName.c_str());
+	return true;
+}
+
+void VBDecompilerEngine::GetAllGuidXref(std::map<ea_t, qvector<ObjData>>& outMap, ea_t HresultCheckObj)
+{
+	//获取所有的数据引用和代码引用
+	qvector<ea_t> vec_Xref;
+	ea_t XrefAddr = get_first_dref_to(HresultCheckObj);
+	while (XrefAddr != BADADDR)
+	{
+		vec_Xref.push_back(XrefAddr);
+		XrefAddr = get_next_dref_to(HresultCheckObj, XrefAddr);
+	}
+
+	XrefAddr = get_first_cref_to(HresultCheckObj);
+	while (XrefAddr != BADADDR)
+	{
+		vec_Xref.push_back(XrefAddr);
+		XrefAddr = get_next_cref_to(HresultCheckObj, XrefAddr);
+	}
+
+	//确定代码范围
+	segment_t* pSegText = get_segm_by_name(".text");
+	ea_t SearchStartAddr;
+	ea_t SearchEndAddr;
+	if (!pSegText)
+	{
+		SearchStartAddr = 0x401000;
+		SearchEndAddr = 0x600000;
+	}
+	else
+	{
+		SearchStartAddr = pSegText->start_ea;
+		SearchEndAddr = pSegText->end_ea;
+	}
+
+	//遍历所有的_vbaHresultCheckObj交叉引用数据
+	for (unsigned int n = 0; n < vec_Xref.size(); ++n)
+	{
+		insn_t ins_Call;
+		decode_insn(&ins_Call, vec_Xref[n]);
+		if (ins_Call.itype != NN_callni)
+		{
+			continue;
+		}
+
+		//FF 15或者call register
+		if (ins_Call.ops[0].type != o_mem && ins_Call.ops[0].type != o_reg)
+		{
+			msg("UnHandle Instruction Type:%a\n", vec_Xref[n]);
+			continue;
+		}
+
+		ea_t GlobalGuidAddr = BADADDR;
+
+		//根据vbaHresultCheckObj函数向上找到Guid
+		qstring InterfaceGuid = FindCheckObjGUID(vec_Xref[n], GlobalGuidAddr);
+		if (!m_GuidMap[InterfaceGuid].size())
+		{
+			//msg("UnHandled ObjUUID:%s\n", InterfaceGuid.c_str());
+			continue;
+		}
+
+		func_t* pFunc = get_func(vec_Xref[n]);
+		if (!pFunc)
+		{
+			continue;
+		}
+
+		ObjData data;
+		qvector<coClassInfo>& vec_coClass = m_GuidMap[InterfaceGuid];
+		data.GuidAddr = vec_Xref[n];
+		data.StructName = vec_coClass[0].StructName;
+
+		//同一个InterfaceGuid对应一个以上的CoClassGuid
+		if (vec_coClass.size() != 1)
+		{
+			//To do...需要通过vbaNew和vbaNew2来进行额外的判断
+			msg("Found a Special ComInterface %s,Ignored...\n", InterfaceGuid.c_str());
+		}
+
+		qstring GuidName = "GUID_";
+		GuidName += data.StructName;
+		set_name(GlobalGuidAddr, GuidName.c_str(), SN_NOWARN);
+		outMap[pFunc->start_ea].push_back(data);
+	}
+	return;
+}
+
+
+
+bool VBDecompilerEngine::HandleCheckObj(func_t* pfunc, qvector<ObjData> vec_ObjData)
+{
+	RefreshFuncion(pfunc->start_ea);
+
+	hexrays_failure_t hf;
+	cfunc_t* cfunc = decompile_func(pfunc, &hf);
+	if (!cfunc)
+	{
+		return false;
+	}
+
+	lvars_t* varList = cfunc->get_lvars();
+	qvector<simpleline_t>& sv = cfunc->sv;
+
+	ea_t CurrentFuncAddr = pfunc->start_ea;
+
+	lvar_saved_infos_t UserFlashInfo;
+	for (unsigned int n = 0; n < vec_ObjData.size(); ++n)
+	{
+		citem_t* pItem = cfunc->body.find_closest_addr(vec_ObjData[n].GuidAddr);
+		if (!pItem || pItem->op != cot_call)
+		{
+			//这里是反编译不了的函数,跳过
+			continue;
+		}
+
+		cexpr_t* pCall = (cexpr_t*)pItem;
+		if (pCall->a->size() != 4)
+		{
+			//这里大部分还是一些异常函数,跳过
+			continue;
+		}
+
+		carg_t& pObjVar = pCall->a->at(1);
+		carg_t& pNumVar = pCall->a->at(3);
+
+		if (pNumVar.op == cot_num)
+		{
+			//大多数情况下我们无法得知var之前的指针类型,故只能采用添加注释法
+			if (!AddFunctionComment(cfunc, pCall, vec_ObjData[n]))
+			{
+				msg("[AddFunctionComment]:Failed...%a\n", vec_ObjData[n].GuidAddr);
+			}
+		}
+
+		if (pObjVar.op == cot_obj)
+		{
+			ea_t Addr = vec_ObjData[n].GuidAddr;
+			qstring ObjType = vec_ObjData[n].StructName + "*;";
+			apply_cdecl(idati, pObjVar.obj_ea, ObjType.c_str(), TINFO_DEFINITE);
+		}
+		if (pObjVar.op == cot_var)
+		{
+			lvar_t& var = varList->at(pObjVar.v.idx);
+			lvar_saved_info_t saveInfo;
+			tinfo_t ObjType = create_typedef(vec_ObjData[n].StructName.c_str());
+			saveInfo.ll = var;
+			saveInfo.type = make_pointer(ObjType);
+			UserFlashInfo.push_back(saveInfo);
+		}
+	}
+
+	for (unsigned int n = 0; n < UserFlashInfo.size(); ++n)
+	{
+		modify_user_lvar_info(CurrentFuncAddr, MLI_TYPE, UserFlashInfo[n]);
+	}
+
+	cfunc->save_user_cmts();
+
+	return true;
 }
 
 //初始化类结构体,返回该结构体的id,如果为-1则失败
@@ -57,11 +331,11 @@ void InitClassStructure(const qstring ClassName, qvector<qstring>& vec_MethodNam
 	tinfo_t VType = make_pointer(create_typedef(VTableName.c_str()));
 	set_member_tinfo(pStruct, get_member(pStruct, 0), 0, VType, SET_MEMTI_USERTI);
 
-	for (int n = 0; n < ClassSize - 4; ++n)
+	for (unsigned int n = 4; n < ClassSize; ++n)
 	{
 		char fieldName[255] = {};
-		qsnprintf(fieldName, sizeof(fieldName), "field_%a", n + 4);
-		add_struc_member(pStruct, fieldName, n + 4, byte_flag(), NULL, 1);
+		qsnprintf(fieldName, sizeof(fieldName), "field_%a", n);
+		add_struc_member(pStruct, fieldName, n, byte_flag(), NULL, 1);
 	}
 
 	return;
@@ -288,7 +562,7 @@ void VBDecompilerEngine::SetSubMain()
 	}
 }
 
-void VBDecompilerEngine::SetEventFuncName(std::map<qstring, qvector<coClassInfo>>& oMap)
+void VBDecompilerEngine::SetEventFuncName()
 {
 	for (unsigned int nObjectIndex = 0; nObjectIndex < VBHEAD.mVec_ObjectTable.size(); ++nObjectIndex)
 	{
@@ -308,7 +582,7 @@ void VBDecompilerEngine::SetEventFuncName(std::map<qstring, qvector<coClassInfo>
 		{
 			mid_ControlInfo& eControlInfo = eObjectMess.m_OptionObjInfo.mVec_ControlInfo[eControlIndex];
 
-			if (!oMap[eControlInfo.m_ControlEventGuid].size())
+			if (!m_GuidMap[eControlInfo.m_ControlEventGuid].size())
 			{
 				continue;
 			}
@@ -316,7 +590,7 @@ void VBDecompilerEngine::SetEventFuncName(std::map<qstring, qvector<coClassInfo>
 			qstring EventFuncName = eObjectMess.m_ObjectName + "::";
 			EventFuncName += eControlInfo.m_ControlName + "::";
 
-			qstring EventTypeName = oMap[eControlInfo.m_ControlEventGuid][0].StructName;
+			qstring EventTypeName = m_GuidMap[eControlInfo.m_ControlEventGuid][0].StructName;
 			EventFuncName += EventTypeName + "_";
 
 			EventTypeName += "_vtbl";
@@ -364,7 +638,86 @@ void VBDecompilerEngine::SetEventFuncName(std::map<qstring, qvector<coClassInfo>
 	}
 }
 
-void VBDecompilerEngine::AddClassGuid(std::map<qstring, qvector<coClassInfo>>& oMap)
+bool VBDecompilerEngine::Load_VBHpp()
+{
+	qstring hppPath = idadir(PLG_SUBDIR);
+	hppPath += "\\COM\\";
+	hppPath += VBHPPFILE;
+
+	if (parse_decls(idati, hppPath.c_str(), NULL, HTI_LOWER | HTI_FIL))
+	{
+		return false;
+	}
+
+	FILE* fFile = qfopen(hppPath.c_str(), "r");
+	if (!fFile)
+	{
+		return false;
+	}
+
+	//State为0是忽略数据
+	//State为1是正在读CoClass
+	//State为2是正在读Guid
+	//State为3是正在读Struct
+	unsigned int LastState = 0;
+	qstring Line;
+	int bStruct = false;
+
+	coClassInfo coInfo;
+	qstring InterfaceGuid;
+	while (qgetline(&Line, fFile) != -1)
+	{
+		if (Line.find("//") != qstring::npos && Line.length() == 38)
+		{
+			if (LastState == 0)
+			{
+				coInfo.coClassGuid = Line.substr(2);
+				LastState = 1;
+				continue;
+			}
+			if (LastState == 1)
+			{
+				InterfaceGuid = Line.substr(2);
+				LastState = 2;
+				continue;
+			}
+			return false;
+		}
+
+		//Struct
+		if (Line.find("struct ") == 0)
+		{
+			//VTable
+			if (!bStruct)
+			{
+				if (LastState == 2)
+				{
+					LastState = 3;
+					bStruct = true;
+					continue;
+				}
+			}
+			else
+			{
+				coInfo.StructName = Line.substr(7);
+				coInfo.StructName.trim2();
+				m_GuidMap[InterfaceGuid].push_back(coInfo);
+				LastState = 3;
+				bStruct = false;
+				continue;
+			}
+			return false;
+		}
+
+		LastState = 0;
+	}
+
+
+	qfclose(fFile);
+	return true;
+}
+
+void VBDecompilerEngine::AddClassGuid()
 {
 	for (unsigned int n = 0; n < VBHEAD.mVec_ObjectTable.size(); ++n)
 	{
@@ -377,9 +730,34 @@ void VBDecompilerEngine::AddClassGuid(std::map<qstring, qvector<coClassInfo>>& o
 			qstring ObjectGuid = eObjectMess.m_ObjectIID;
 			Info.coClassGuid = "00000000-0000-0000-0000-000000000000";
 			Info.StructName = eObjectMess.m_ObjectName;
-			oMap[ObjectGuid].push_back(Info);
+			m_GuidMap[ObjectGuid].push_back(Info);
 		}
 	}
+}
+
+
+bool VBDecompilerEngine::FlashComInterface()
+{
+	ea_t HresultCheckObj = GetHresultCheckObjAddr();
+
+	//key值为函数地址,value值为当前函数的所有Obj数据
+	std::map<ea_t, qvector<ObjData>> map_Obj;
+	GetAllGuidXref(map_Obj, HresultCheckObj);
+
+	for (std::map<ea_t, qvector<ObjData>>::iterator it = map_Obj.begin(); it != map_Obj.end(); it++)
+	{
+		if (!it->first)
+		{
+			continue;
+		}
+		func_t* pfunc = get_func(it->first);
+		if (!pfunc)
+		{
+			continue;
+		}
+		HandleCheckObj(pfunc, it->second);
+	}
+	return true;
 }
 
 void VBDecompilerEngine::MakeFunction()
@@ -942,6 +1320,5 @@ bool VBDecompilerEngine::DoDecompile(ea_t PEEntry)
 	}
 
 
-	//HandleNativeCode(aVBHeaderAddr);
 	return true;
 }

@@ -1,5 +1,5 @@
 #include "public.h"
-
+#include <allins.hpp>
 til_t* idati = NULL;
 
 qstring charToUUID(uint8* uuid_Addr)
@@ -48,3 +48,4 @@ qstring get_shortstring(ea_t ea)
 	qstring ret = buffer;
 	return ret;
 }
+
